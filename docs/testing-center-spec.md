@@ -556,6 +556,221 @@ AIStatus in ("PENDING", "FAILED")
 
 用途：第二階段 AI 分析工作佇列。
 
+## 設定資料設計
+
+設定區用來保存「測試執行前需要參考的外部條件」，不是測試案例本身。
+
+可以這樣理解：
+
+```text
+測試案例：要測什麼
+測試步驟：怎麼測
+測試環境：去哪裡測
+測試帳號：用誰測
+Runner 設定：用哪個程式、在哪裡跑、產物放哪裡
+```
+
+核心原則：
+
+- 測試案例不要寫死網址、帳密、執行路徑。
+- `StepsJson` 不存密碼、API key、token。
+- 不同環境、不同帳號、不同 Runner 的差異，應透過設定帶入。
+- AI 分析時可引用設定的顯示名稱與角色，但不得取得密碼明文。
+
+### 測試環境
+
+用途：定義 DEV、UAT、正式前測試環境等連線資訊。執行測試時，使用者選擇一個測試環境，Runner 依此取得系統網址、登入網址與測試產物儲存位置。
+
+建議欄位：
+
+| 畫面欄位 | 內部欄位代號 | 說明 |
+|---|---|---|
+| 文件類型 | `DocType` | 固定為 `TestEnvironment` |
+| 環境代號 | `EnvironmentId` | 例如 `DEV`、`UAT`、`PRODLIKE` |
+| 環境名稱 | `EnvironmentName` | 例如 `UAT 測試環境` |
+| 環境類型 | `EnvironmentType` | `DEV / UAT / PROD-like` |
+| 系統網址 | `BaseUrl` | 測試系統首頁或根網址 |
+| 登入網址 | `LoginUrl` | 登入頁網址 |
+| Domino Server | `DominoServer` | 例如 `Server01/Org`，選填 |
+| 資料庫路徑 | `DatabasePath` | 例如 `Eform2/eform.nsf`，選填 |
+| 報告根目錄 | `ReportRootPath` | 測試報告在檔案系統的根目錄 |
+| 報告 URL 前綴 | `ReportUrlPrefix` | UI 開啟報告時使用的 URL 前綴 |
+| 是否啟用 | `IsActive` | `是 / 否` |
+| 備註 | `Remark` | 例如需 VPN、內網限定 |
+
+範例：
+
+```text
+環境代號：UAT
+環境名稱：UAT 測試環境
+系統網址：https://uat.example.com
+登入網址：https://uat.example.com/login
+報告根目錄：D:\react\Eform2\reports
+報告 URL 前綴：http://server/reports
+是否啟用：是
+```
+
+MVP 最小欄位：
+
+```text
+環境代號
+環境名稱
+系統網址
+登入網址
+報告根目錄
+是否啟用
+```
+
+### 測試帳號
+
+用途：定義測試角色對應的帳號。測試案例與 `StepsJson` 只引用帳號代號，不直接保存帳密。
+
+登入步驟建議這樣寫：
+
+```json
+{
+  "order": 1,
+  "moduleId": "common.login",
+  "params": {
+    "accountKey": "engineer"
+  },
+  "expected": "工程師測試帳號登入成功"
+}
+```
+
+Runner 執行時再用 `accountKey = engineer` 去「測試帳號」設定找登入帳號與密碼來源。
+
+建議欄位：
+
+| 畫面欄位 | 內部欄位代號 | 說明 |
+|---|---|---|
+| 文件類型 | `DocType` | 固定為 `TestAccount` |
+| 帳號代號 | `AccountKey` | 例如 `engineer`、`applicant`、`approver` |
+| 顯示名稱 | `AccountName` | 例如 `工程師測試帳號` |
+| 適用環境 | `EnvironmentId` | 對應測試環境代號 |
+| 測試角色 | `TestRole` | 例如 `工程師 / 申請人 / 主管 / 系統管理員` |
+| 登入帳號 | `Username` | 實際登入帳號 |
+| 密碼來源 | `PasswordSource` | `ENV / Secret Manager / Domino 加密欄位` |
+| 密碼 Key | `PasswordKey` | 例如 `TEST_PASS_ENGINEER` |
+| 是否啟用 | `IsActive` | `是 / 否` |
+| 備註 | `Remark` | 例如可開啟哪些表單或具備哪些權限 |
+
+範例：
+
+```text
+帳號代號：engineer
+顯示名稱：工程師測試帳號
+適用環境：UAT
+測試角色：工程師
+登入帳號：test_engineer01
+密碼來源：ENV
+密碼 Key：TEST_PASS_ENGINEER
+是否啟用：是
+```
+
+MVP 最小欄位：
+
+```text
+帳號代號
+測試角色
+登入帳號
+密碼來源
+密碼 Key
+適用環境
+是否啟用
+```
+
+注意事項：
+
+- 不要把密碼放在 `StepsJson`。
+- 不要把密碼放在 `TestRun.StepsSnapshotJson`。
+- 不要把密碼放進 AI Analysis Bundle。
+- 若暫時使用 Domino 欄位保存密碼，需使用加密欄位或公司既有安全機制。
+
+### Runner 設定
+
+用途：定義測試程式怎麼被啟動、在哪個工作目錄執行、測試模組從哪裡讀取、產物要保存到哪裡。
+
+建議欄位：
+
+| 畫面欄位 | 內部欄位代號 | 說明 |
+|---|---|---|
+| 文件類型 | `DocType` | 固定為 `RunnerConfig` |
+| Runner 代號 | `RunnerId` | 例如 `local-node-runner` |
+| Runner 名稱 | `RunnerName` | 例如 `本機 Node.js Runner` |
+| Runner 類型 | `RunnerType` | `Node.js / Python` |
+| 執行命令 | `Command` | 例如 `node runner.js` |
+| 工作目錄 | `WorkingDirectory` | Runner 執行時的工作目錄 |
+| 測試模組目錄 | `ModuleRootPath` | 測試模組檔案所在目錄 |
+| 輸出根目錄 | `OutputRootPath` | 測試結果與產物輸出根目錄 |
+| 瀏覽器 | `BrowserName` | `chromium / firefox / webkit` |
+| Headless | `Headless` | `是 / 否` |
+| 預設逾時秒數 | `DefaultTimeoutSec` | 預設 timeout |
+| 重試次數 | `RetryCount` | 預設 retry |
+| Trace 模式 | `TraceMode` | `失敗保留 / 每次保留 / 不保留` |
+| 截圖模式 | `ScreenshotMode` | `失敗截圖 / 每步截圖 / 不截圖` |
+| 錄影模式 | `VideoMode` | `開 / 關` |
+| 產物保留天數 | `RetentionDays` | 測試產物保留多久 |
+| 是否啟用 | `IsActive` | `是 / 否` |
+
+範例：
+
+```text
+Runner 代號：local-node-runner
+Runner 名稱：本機 Node.js Runner
+Runner 類型：Node.js
+執行命令：node runner.js
+工作目錄：D:\react\Eform2
+測試模組目錄：D:\react\Eform2\test-modules
+輸出根目錄：D:\react\Eform2\results
+瀏覽器：chromium
+Headless：是
+Trace 模式：失敗保留
+截圖模式：失敗截圖
+是否啟用：是
+```
+
+MVP 最小欄位：
+
+```text
+Runner 代號
+執行命令
+工作目錄
+測試模組目錄
+輸出根目錄
+Headless
+Trace 模式
+截圖模式
+是否啟用
+```
+
+### 設定資料與測試執行的關係
+
+執行單一測試案例時：
+
+```text
+使用者選擇 TestCase
+  -> 選擇測試環境
+  -> TestCase.StepsJson 指定 accountKey / formCode 等參數
+  -> Runner 讀取測試環境、測試帳號、Runner 設定
+  -> 執行測試模組
+  -> 產生 TestRun
+```
+
+執行測試集合時：
+
+```text
+使用者選擇 TestSuite
+  -> 選擇測試環境
+  -> 建立 TestBatch
+  -> 針對集合內每個 TestCase 建立 TestRun
+  -> 每筆 TestRun 共用同一個 BatchId
+```
+
+給工程師的重點：
+
+> 設定區是讓 TestCase 不要寫死環境、帳密與執行路徑；TestCase 只描述測試規格，實際去哪跑、用誰跑、怎麼跑，都從設定帶入。
+
 ## 表單按鈕建議
 
 ### 測試案例主文件按鈕

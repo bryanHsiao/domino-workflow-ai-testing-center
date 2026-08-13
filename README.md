@@ -66,8 +66,5 @@ AI 功能可於第二階段逐步加入，先以錯誤分析與測試案例生�
 
 ## 文件
 
-- [Project Vision](docs/project-vision.md)
-- [MVP Plan](docs/mvp-plan.md)
-- [Engineering Brief](docs/engineering-brief.md)
-- [Conference Outline](docs/conference-outline.md)
-- [Architecture](docs/architecture.md)
+- [測試中台 MVP 規格](docs/testing-center-spec.md)
+- [本機 Runner 環境設定](docs/local-runner-environment-setup.md)

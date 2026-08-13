@@ -9,6 +9,7 @@ MVP 建議調整為：
 ```text
 測試模組（TestModule）：可重用測試腳本積木
 測試案例（TestCase）：主文件，定義要跑哪些測試模組
+測試集合（TestSuite）：一包測試案例，例如 smoke / regression / permission
 執行紀錄（TestRun）：測試案例的子文件，每跑一次建立一筆紀錄
 ```
 
@@ -27,8 +28,10 @@ MVP 建議調整為：
 
 | 中文名稱 | 內部代號 | 說明 |
 |---|---|---|
+| 應用系統 | `TestSystem` | 被測試的系統或應用，例如電子表單平台、差勤系統 |
 | 測試模組 | `TestModule` | 可重用腳本積木 |
 | 測試案例 | `TestCase` | 主文件，定義測試規格 |
+| 測試集合 | `TestSuite` | 一包測試案例，類似 Postman Collection |
 | 執行紀錄 | `TestRun` | 子文件，每跑一次建立一筆 |
 | 執行批次 | `TestBatch` | 第二階段用，多筆案例共用一次批次脈絡 |
 | 測試產物 | `Artifacts` | Report、Screenshot、Trace、Console Log |
@@ -37,7 +40,14 @@ MVP 建議調整為：
 ## 資料模型總覽
 
 ```text
+應用系統
+  - 系統代號
+  - 系統名稱
+  - 系統類型
+  - 說明
+
 既有表單 / 流程設定
+  - 系統代號
   - 表單代號
   - 表單名稱
   - 流程名稱
@@ -51,16 +61,70 @@ MVP 建議調整為：
   - 必填參數
 
 測試案例主文件
+  - 系統代號
   - 表單代號 / 流程名稱
   - 測試目的
   - 測試模組組合順序
   - 預期結果
+
+測試集合
+  - 系統代號
+  - 集合代號
+  - 集合名稱
+  - 測試案例清單
 
 執行紀錄子文件
   - 每次執行狀態
   - 步驟結果
   - 報告 / 截圖 / Trace / Console Log
   - AI 摘要 / AI 建議
+```
+
+## 應用系統（TestSystem）
+
+實際導入時，測試中台不會只服務一個系統。公司可能有多個 Domino Web Application，每個系統底下又有多張表單與多條流程。
+
+因此建議新增「應用系統」作為第一層主資料：
+
+```text
+應用系統
+  -> 表單 / 流程
+  -> 測試案例
+  -> 測試集合
+  -> 執行紀錄
+```
+
+範例：
+
+```text
+電子表單平台
+  - 079009 可攜式資料載具申請書
+  - 079010 IP 位址代填單
+
+差勤系統
+  - LEAVE001 請假單
+  - OT001 加班申請單
+```
+
+### 應用系統欄位
+
+| 畫面欄位 | 內部欄位代號 | 說明 |
+|---|---|---|
+| 文件類型 | `DocType` | 固定為 `TestSystem` |
+| 系統代號 | `SystemId` | 例如 `EFORM`、`HRFLOW` |
+| 系統名稱 | `SystemName` | 例如 `電子表單平台` |
+| 系統類型 | `SystemType` | 例如 `Domino Web / REST Web / External Web` |
+| 系統狀態 | `SystemStatus` | `啟用 / 停用` |
+| 說明 | `Description` | 系統用途說明 |
+| 維護者 | `Owner` | 系統測試負責人 |
+| 最近修改時間 | `ModifiedAt` | 最近修改時間 |
+
+MVP 最小欄位：
+
+```text
+系統代號
+系統名稱
+系統狀態
 ```
 
 ## 測試模組（TestModule）
@@ -127,7 +191,7 @@ export async function run(ctx, params) {
 例如：
 
 ```text
-079009-OPEN-001：可攜式資料載具申請書 - 開啟表單測試
+EFORM-079009-OPEN-001：可攜式資料載具申請書 - 開啟表單測試
   1. common.login
   2. form.open
 ```
@@ -137,12 +201,13 @@ export async function run(ctx, params) {
 | 畫面欄位 | 內部欄位代號 | 說明 |
 |---|---|---|
 | 文件類型 | `DocType` | 固定為 `TestCase` |
-| 案例代號 | `CaseId` | 測試案例代號，例如 `079009-OPEN-001` |
+| 案例代號 | `CaseId` | 測試案例代號，例如 `EFORM-079009-OPEN-001` |
 | 案例名稱 | `CaseName` | 測試案例名稱 |
 | 案例狀態 | `CaseStatus` | `草稿 / 啟用 / 淘汰` |
+| 系統代號 | `SystemId` | 引用應用系統代號，例如 `EFORM` |
 | 表單代號 | `FormCode` | 引用既有表單代號，例如 `079009` |
 | 流程名稱 | `FlowName` | 引用既有流程名稱，例如 `079009_Flow` |
-| 測試套件 | `TestSuite` | 例如 `079009 自動化測試` |
+| 測試集合 | `TestSuite` | 例如 `EFORM-079009-SMOKE` |
 | 測試目的 | `Purpose` | 這個案例驗證什麼 |
 | 測試角色 | `TestRole` | 測試角色 / 帳號群組，例如 `申請人` |
 | 前置條件 | `Precondition` | 測試前必須滿足的條件 |
@@ -196,6 +261,53 @@ export async function run(ctx, params) {
 
 這些都屬於執行紀錄或未來的執行批次。
 
+## 測試集合（TestSuite）
+
+測試集合是一包測試案例，類似 Postman Collection。它用來定義「一次要跑哪些 TestCase」，不是功能名稱，也不是測試模組清單。
+
+範例：
+
+```text
+EFORM-079009-SMOKE：079009 基本冒煙測試
+  - EFORM-079009-OPEN-001
+  - EFORM-079009-SUBMIT-001
+
+EFORM-079009-REGRESSION：079009 回歸測試
+  - EFORM-079009-OPEN-001
+  - EFORM-079009-SUBMIT-001
+  - EFORM-079009-APPROVE-001
+  - EFORM-079009-CLOSE-001
+```
+
+### 測試集合必要欄位
+
+| 畫面欄位 | 內部欄位代號 | 說明 |
+|---|---|---|
+| 文件類型 | `DocType` | 固定為 `TestSuite` |
+| 集合代號 | `SuiteId` | 例如 `EFORM-079009-SMOKE` |
+| 集合名稱 | `SuiteName` | 例如 `079009 基本冒煙測試` |
+| 集合狀態 | `SuiteStatus` | `草稿 / 啟用 / 停用` |
+| 系統代號 | `SystemId` | 引用應用系統代號，例如 `EFORM` |
+| 說明 | `Description` | 這個集合的用途 |
+| 測試案例清單 | `CaseListJson` | 要執行的 `CaseId` 清單與順序 |
+| 分類標籤 | `Tags` | `smoke / regression / permission` |
+| 維護者 | `Owner` | 集合維護者 |
+
+`CaseListJson` 範例：
+
+```json
+[
+  {
+    "order": 1,
+    "caseId": "EFORM-079009-OPEN-001"
+  },
+  {
+    "order": 2,
+    "caseId": "EFORM-079009-SUBMIT-001"
+  }
+]
+```
+
 ## 執行紀錄（TestRun）
 
 執行紀錄是測試案例的 response document。每按一次「執行測試」，就建立一筆執行紀錄。
@@ -210,6 +322,7 @@ export async function run(ctx, params) {
 | 案例代號 | `ParentCaseId` | 對應 `CaseId` |
 | 批次代號 | `BatchId` | 同批回歸測試 ID，MVP 可先保留空值 |
 | 案例名稱快照 | `CaseNameSnapshot` | 執行當下的案例名稱 |
+| 系統代號快照 | `SystemIdSnapshot` | 執行當下的系統代號 |
 | 表單代號快照 | `FormCodeSnapshot` | 執行當下的表單代號 |
 | 流程名稱快照 | `FlowNameSnapshot` | 執行當下的流程名稱 |
 | 測試步驟快照 | `StepsSnapshotJson` | 執行當下的測試步驟 JSON |
@@ -266,6 +379,7 @@ export async function run(ctx, params) {
 因此執行紀錄建立時，應保存當下的：
 
 - `CaseNameSnapshot`
+- `SystemIdSnapshot`
 - `FormCodeSnapshot`
 - `FlowNameSnapshot`
 - `StepsSnapshotJson`
@@ -280,7 +394,7 @@ MVP 可以先不做完整執行批次表單，但執行紀錄要先保留 `Batch
 
 ```text
 建立執行批次
-  -> 選擇測試套件或多筆測試案例
+  -> 選擇測試集合或多筆測試案例
   -> 填一次測試環境 / 執行原因 / 本次變更說明
   -> 產生多筆執行紀錄
   -> 每筆執行紀錄共用同一個 BatchId
@@ -297,10 +411,11 @@ MVP 可以先不做完整執行批次表單，但執行紀錄要先保留 `Batch
 ```json
 {
   "runId": "RUN-20260810-0001",
-  "caseId": "079009-OPEN-001",
+  "caseId": "EFORM-079009-OPEN-001",
   "caseName": "可攜式資料載具申請書 - 開啟表單測試",
+  "systemId": "EFORM",
   "environment": "UAT",
-  "outputDir": "D:/react/Eform2/079009/results/20260810191222",
+  "outputDir": "<report-root>/EFORM/079009/20260810191222",
   "steps": [
     {
       "order": 1,
@@ -362,10 +477,10 @@ Runner 完成後要輸出固定 `result.json`，不要只靠 console 文字解�
     }
   ],
   "artifacts": {
-    "reportPath": "D:/react/Eform2/079009/results/20260810191222/report.md",
+    "reportPath": "<report-root>/EFORM/079009/20260810191222/report.md",
     "screenshotPath": "",
-    "tracePath": "D:/react/Eform2/079009/results/20260810191222/trace.zip",
-    "consoleLogPath": "D:/react/Eform2/079009/results/20260810191222/console.log"
+    "tracePath": "<report-root>/EFORM/079009/20260810191222/trace.zip",
+    "consoleLogPath": "<report-root>/EFORM/079009/20260810191222/console.log"
   },
   "error": null
 }
@@ -393,28 +508,23 @@ Runner 完成後要輸出固定 `result.json`，不要只靠 console 文字解�
 
 ## 導覽與 View 設計
 
-建議左側導覽先設計成以下結構。
+建議左側導覽先設計成以下結構。第一層以「系統」作為入口，因為實際導入時 Testing Center 會服務多個系統，每個系統底下才有表單、測試集合、測試案例、測試模組與執行紀錄。
 
 ```text
 自動化測試
-  儀表板
+  總覽
+    系統總覽
+    執行總覽
+    失敗追蹤
 
-  測試案例
-    依表單
-    依測試套件
-    啟用中
-    草稿
-    已淘汰
-
-  測試模組
-    所有模組
-    依類型
-    已停用
+  測試資產
+    測試集合
+    測試案例
+    測試模組
 
   執行紀錄
-    最新執行紀錄
+    最新執行
     失敗紀錄
-    依測試案例
     依執行批次
 
   AI 分析
@@ -422,14 +532,42 @@ Runner 完成後要輸出固定 `result.json`，不要只靠 console 文字解�
     分析歷史
 
   設定
+    系統管理
     測試環境
     測試帳號
     Runner 設定
+    標籤管理
 ```
 
-### 儀表板
+點進單一系統後，該系統底下建議再呈現：
 
-用途：中台首頁，快速看整體狀態。
+```text
+EFORM 電子化表單平台
+  測試集合
+  測試案例
+  測試模組
+  執行紀錄
+  失敗分析
+```
+
+### 系統總覽
+
+用途：Testing Center 首頁，快速看到目前管理了哪些系統，以及每個系統的測試覆蓋與最近執行狀況。
+
+建議顯示：
+
+- 系統代號
+- 系統名稱
+- 系統說明
+- 測試集合數量
+- 測試案例數量
+- 最近 7 天通過數
+- 最近 7 天失敗數
+- 進入案例總覽
+
+### 執行總覽
+
+用途：從執行角度快速看整體測試狀態。
 
 建議顯示：
 
@@ -440,39 +578,40 @@ Runner 完成後要輸出固定 `result.json`，不要只靠 console 文字解�
 - 失敗紀錄數量
 - 常用「執行測試」入口
 
-### 測試案例 / 依表單
+### 測試案例
 
 資料來源：`DocType = TestCase`
 
 欄位：
 
 ```text
+系統代號
 表單代號
 流程名稱
 案例代號
 案例名稱
-測試套件
+測試集合
 案例狀態
 最近執行結果
 最近執行時間
 ```
 
-### 測試案例 / 依測試套件
+### 測試集合
 
-資料來源：`DocType = TestCase`
+資料來源：`DocType = TestSuite`
 
-第一欄以 `TestSuite` 分類，方便一次看某套回歸測試有哪些案例。
+用來管理一包測試案例，例如冒煙測試、回歸測試、權限測試。
 
 欄位：
 
 ```text
-測試套件
-案例代號
-案例名稱
-表單代號
-優先級
-最近執行結果
+系統代號
+集合代號
+集合名稱
+集合狀態
+測試案例數量
 最近執行時間
+最近執行結果
 ```
 
 ### 測試模組 / 所有模組
@@ -605,7 +744,7 @@ Runner 設定：用哪個程式、在哪裡跑、產物放哪裡
 環境名稱：UAT 測試環境
 系統網址：https://uat.example.com
 登入網址：https://uat.example.com/login
-報告根目錄：D:\react\Eform2\reports
+報告根目錄：<report-root>
 報告 URL 前綴：http://server/reports
 是否啟用：是
 ```
@@ -720,9 +859,9 @@ Runner 代號：local-node-runner
 Runner 名稱：本機 Node.js Runner
 Runner 類型：Node.js
 執行命令：node runner.js
-工作目錄：D:\react\Eform2
-測試模組目錄：D:\react\Eform2\test-modules
-輸出根目錄：D:\react\Eform2\results
+工作目錄：<workspace>
+測試模組目錄：<workspace>\test-modules
+輸出根目錄：<report-root>
 瀏覽器：chromium
 Headless：是
 Trace 模式：失敗保留
@@ -839,7 +978,7 @@ Trace 模式
 
 - 可以新增一個測試模組：`common.login`
 - 可以新增一個測試模組：`form.open`
-- 可以新增一個測試案例：`079009-OPEN-001`
+- 可以新增一個測試案例：`EFORM-079009-OPEN-001`
 - 測試案例可以設定步驟：`common.login` -> `form.open`
 - 按下「執行測試」會建立一筆執行紀錄子文件
 - Runner 會依序執行兩個測試模組

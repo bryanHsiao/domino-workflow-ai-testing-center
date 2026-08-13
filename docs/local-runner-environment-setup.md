@@ -2,33 +2,52 @@
 
 ## 背景
 
-Testing Center 的正式架構建議以「中台觸發、Runner 統一執行」為主，讓測試環境、測試產物與執行紀錄集中管理。
+Testing Center 的長期架構可以往「中台觸發、Runner 統一執行」發展，讓測試環境、測試產物與執行紀錄集中管理。
 
-但在導入初期，也可能會遇到另一種做法：每位測試或開發人員在自己的電腦安裝 Node.js、Playwright 與瀏覽器，透過本機 Runner 執行測試。這種模式可以降低初期伺服器建置成本，但要特別處理環境一致性。
+但在 MVP 初期，本機 Runner 是合理且務實的起手式：每位測試或開發人員在自己的電腦安裝 Node.js、Playwright 與瀏覽器，透過本機 Runner 執行測試，再把結果回寫 Testing Center。這樣可以先把「測試案例管理、執行紀錄、報告保存」做起來，不需要一開始就投入中央 Runner Server 的維運成本。
 
-本文件記錄「如果採用本機 Runner，如何讓每台電腦的測試環境盡量一致」。
+本文件記錄「第一階段採用本機 Runner 時，如何讓每台電腦的測試環境盡量一致」，並保留未來升級到中央 Runner 的銜接方向。
 
-## 適用情境
+## 階段定位
 
-本機 Runner 適合：
+### 第一階段：本機 Runner（MVP）
+
+目標是先讓 Testing Center 可以真的跑測試、收結果、看紀錄。
+
+本階段重點：
 
 - POC 或 MVP 初期驗證
 - 工程師需要開啟 headed browser 除錯
 - 測試案例尚在開發、需要快速調整腳本
-- 中央 Runner Server 尚未建置完成
+- 中台先完成 TestCase、TestSuite、TestRun 與測試產物保存
+- Runner 合約先固定，避免未來更換執行環境時重做中台
 
-本機 Runner 不適合：
-
-- 多人長期正式回歸測試
-- 需要穩定產生正式測試報告
-- 需要統一控管測試環境與測試產物
-- 需要作為 release gate 或 CI/CD 的依據
-
-因此建議定位為：
+第一階段可以這樣定位：
 
 ```text
-本機 Runner：開發、除錯、POC
-中央 Runner：正式回歸測試、報告保存、CI/CD
+Testing Center 管理測試案例與執行紀錄
+本機 Runner 負責實際執行 Playwright
+Runner 產生 result.json、Report、Screenshot、Trace、Console Log
+Testing Center 回寫執行結果
+```
+
+### 第二階段：中央 Runner（產品化）
+
+當測試案例變多、使用者變多，或開始需要正式回歸測試與上版控管時，再把 Runner 從個人電腦集中到一台或多台 Runner Server。
+
+第二階段重點：
+
+- 統一控管 Node.js、Playwright 與瀏覽器版本
+- 測試產物集中保存
+- 支援排程測試、批次回歸測試、CI/CD
+- 減少「在某台電腦可以跑、換一台就失敗」的環境差異
+- 讓 AI 分析可以穩定取得完整的 Analysis Bundle
+
+因此建議的演進路線是：
+
+```text
+第一階段：本機 Runner，先把 MVP 跑起來
+第二階段：中央 Runner，把測試能力產品化與穩定化
 ```
 
 ## 前提：確認公司網路是否允許下載 Playwright 瀏覽器
@@ -132,6 +151,6 @@ Playwright 官方提供 container image，可把 Node.js、Playwright、瀏覽�
 
 ## 結論
 
-本機 Runner 可以作為 MVP 初期與工程師開發測試腳本時的過渡方案，但不應視為長期正式架構。
+本機 Runner 不是錯誤架構，而是 MVP 初期很合理的第一階段。它可以讓團隊先把測試中台、測試案例、測試集合、執行紀錄與測試產物保存做出來。
 
-Testing Center 若要成為產品能力，正式測試仍建議集中到中央 Runner，才能穩定保存測試紀錄、Report、Screenshot、Trace、Console Log 與 AI 分析結果。
+真正需要先守住的是 Runner 合約：輸入要固定、輸出要固定、Report / Screenshot / Trace / Console Log 要固定保存。只要這個合約穩定，第一階段用本機 Runner，第二階段改成中央 Runner 時，中台資料模型與使用者操作流程都不需要重做。
